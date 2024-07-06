@@ -24,7 +24,7 @@ int main()
 
     if (hModule != nullptr)
     {
-        // 初始化 MFC 并在失败时显示错误1
+        // 初始化 MFC 并在失败时显示错误
         if (!AfxWinInit(hModule, nullptr, ::GetCommandLine(), 0))
         {
             // TODO: 在此处为应用程序的行为编写代码。
@@ -33,7 +33,7 @@ int main()
         }
         else
         {
-            // TODO: 在此处为应用程序的行为编写代码。
+            // TODO: 在此处为应用程序的行为编写代码。d
         }
     }
     else
