@@ -35,26 +35,27 @@ int main()
         else
         {
             // TODO: 在此处为应用程序的行为编写代码。
-            //套接字初始化
             
-            SOCKET serv_sock = socket(PF_INET, SOCK_STREAM, 0); //TODO:校验
-            sockaddr_in serv_adr, client_adr;
-            memset(&serv_adr, 0, sizeof(serv_adr));
-            serv_adr.sin_addr.s_addr = INADDR_ANY;
-            serv_adr.sin_family = AF_INET;
-            serv_adr.sin_port = htons(9527);
-            //绑定
-            bind(serv_sock, (sockaddr*)&serv_adr, sizeof(serv_adr));
-            listen(serv_sock, 1);
-
-            char buffer[1024] = "";
-            int cli_size = sizeof(client_adr);
-
-            SOCKET client_sock = accept(serv_sock, (sockaddr*)&client_adr, &cli_size);
-            recv(serv_sock, buffer, sizeof(buffer), 0);
-            send(serv_sock, buffer, sizeof(buffer), 0);
-            
-            closesocket(serv_sock);
+            CServerSocket* pserver =  CServerSocket::getInstance();
+            int count = 0;
+			if (pserver->initSocket() == FALSE) {
+				MessageBox(NULL, _T("initSocket失败"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
+				exit(0);
+			}
+            while (CServerSocket::getInstance() != NULL)
+            {
+                if (pserver->acceptClient() == FALSE)
+                {
+                    if (count > 4)
+                    {
+						MessageBox(NULL, _T("acceptClient失败"), _T("连接客户端失败"), MB_OK | MB_ICONERROR);
+						exit(0);
+                    }
+					MessageBox(NULL, _T("acceptClient超时"), _T("重新连接客户端"), MB_OK | MB_ICONERROR);
+                    count++;
+                }
+                int ret = pserver->dealCommand();
+            }
 
         }
     }
