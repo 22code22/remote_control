@@ -6,6 +6,9 @@
 #include "RemoteCtrl.h"
 #include "ServerSocket.h"
 #include <direct.h>
+#include <io.h>
+#include <stdio.h>
+#include <list>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -18,6 +21,7 @@ CWinApp theApp;
 
 using namespace std;
 
+//调试输出包
 void Dump(BYTE* pData, size_t nSize) {
     std::string strOut;
     for (size_t i = 0; i < nSize; i++)
@@ -47,6 +51,66 @@ int MakeDriverInfo() { //1=>A 2=>B 3=>C...
     CPacket pack(1, (BYTE*)result.c_str(), result.size());
     Dump((BYTE*)pack.Data() ,pack.Size());
 //     CServerSocket::getInstance()->Send(pack);
+    return 0;
+}
+
+//文件结构体
+typedef struct file_info{
+    file_info() {
+        isInvalid = 0;
+        isDirectory = -1;
+        hasNext = TRUE;
+        memset(szFileName, 0, sizeof(szFileName));
+    }
+    char szFileName[256];
+    BOOL isDirectory;   //是否为目录 1是0否
+    BOOL isInvalid; //是否有效
+    BOOL hasNext;   //是否含有后续 0没有1有
+}FILEINFO, *PFILEINFO;
+
+//切片式发送
+int MakeDirectoryInfo() {
+    std::string strPath;
+//     std::list<FILEINFO> listFileInfos;
+    if (CServerSocket::getInstance()->GetFilePath(strPath) == FALSE) {
+        OutputDebugString(_T("当前命令不是获取文件列表，命令解析错误!"));
+        return -1;
+    }
+    if (_chdir(strPath.c_str()) != 0) {
+        FILEINFO finfo;
+        finfo.isInvalid = TRUE;
+		finfo.isDirectory = TRUE;
+        finfo.hasNext = FALSE;
+        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
+//         listFileInfos.push_back(finfo);
+        CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+        CServerSocket::getInstance()->Send(pack);
+        OutputDebugString(_T("没有权限访问目录或目录错误!"));
+        return -2;
+    }
+    //查找文件
+    _finddata_t fdata;
+    int hfind = 0;
+    if ((hfind = _findfirst("*", &fdata)) == -1) {
+        OutputDebugString(_T("没有找到文件!"));
+        return -3;
+    }
+    do 
+    {
+        FILEINFO finfo;
+        finfo.isDirectory = (fdata.attrib & _A_SUBDIR) != 0;
+        memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
+// 		listFileInfos.push_back(finfo);
+		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+		CServerSocket::getInstance()->Send(pack);
+    } while (!_findnext(hfind, &fdata));
+
+    //最后发送一个NULL， FALSE, FALSE的fileinfo来表示结束
+    FILEINFO finfo;
+    finfo.hasNext = FALSE;
+	CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+	CServerSocket::getInstance()->Send(pack);
+
     return 0;
 }
 
@@ -91,12 +155,14 @@ int main()
 //             }
 
             //实现功能
-            int nCmd = 1;
+            int nCmd = 2;
             switch (nCmd)
             {
             case 1: //查看磁盘分区
 				MakeDriverInfo();
                 break;
+            case 2: //查看指定目录下文件
+                MakeDirectoryInfo();
             default:
                 break;
             }
