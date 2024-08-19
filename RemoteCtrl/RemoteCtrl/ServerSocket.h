@@ -13,8 +13,14 @@ public:
 		sHead = 0xFEFF;
 		nLength = nsize + 4;
 		sCmd = nCmd;
-		strData.resize(nsize);
-		memcpy((BYTE*)strData.c_str(), pdata, nsize);
+		if (nsize > 0) {
+			strData.resize(nsize);
+			memcpy((BYTE*)strData.c_str(), pdata, nsize);
+		}
+		else
+		{
+			strData.clear();
+		}
 		sSum = 0;
 		for (size_t j = 0; j < strData.size(); j++) {
 			sSum += BYTE(strData[j]) & 0XFF;
@@ -206,7 +212,7 @@ public:
 
 	}
 	BOOL GetFilePath(std::string& strPath) {
-		if (m_packet.sCmd == 2) {
+		if (m_packet.sCmd == 2 || m_packet.sCmd == 3 || m_packet.sCmd == 4) {
 			strPath = m_packet.strData;
 			return TRUE;
 		}
