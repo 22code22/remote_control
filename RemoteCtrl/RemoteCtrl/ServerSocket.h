@@ -2,11 +2,25 @@
 #include "pch.h"
 #include "framework.h"
 
+#pragma pack(push)
+#pragma pack(1)
 //数据包
 class CPacket
 {
 public:
 	CPacket() : sHead(0), nLength(0), sCmd(0), sSum(0) {}
+	CPacket(WORD nCmd, const BYTE* pdata, size_t nsize) {
+		sHead = 0xFEFF;
+		nLength = nsize + 4;
+		sCmd = nCmd;
+		strData.resize(nsize);
+		memcpy((BYTE*)strData.c_str(), pdata, nsize);
+		sSum = 0;
+		for (size_t j = 0; j < strData.size(); j++) {
+			sSum += BYTE(strData[j]) & 0XFF;
+		}
+
+	}
 	CPacket(const CPacket& packet){
 		sHead = packet.sHead;
 		nLength = packet.nLength;
@@ -53,7 +67,7 @@ public:
 		//校验
 		WORD sum = 0;
 		for (size_t j = 0; j < strData.size(); j++) {
-			sum += BYTE(strData[i]) & 0XFF;
+			sum += BYTE(strData[j]) & 0XFF;
 		}
 		if (sum == sSum) {
 			nSize = i;
@@ -74,6 +88,25 @@ public:
 		return *this;
 	}
 
+	int Size() {
+		return nLength + 6;
+	}
+
+	const char* Data() {
+		strOut.resize(nLength + 6);
+		BYTE* pData = (BYTE*)strOut.c_str();
+		*(WORD*)pData = sHead;
+		pData += 2;
+		*(DWORD*)pData = nLength;
+		pData += 4;
+		*(WORD*)pData = sCmd;
+		pData += 2;
+		memcpy(pData, strData.c_str(), strData.size());
+		pData += strData.size();
+		*(WORD*)pData = sSum;
+		return strOut.c_str();
+	}
+
 	~CPacket() {}
 
 public:
@@ -82,7 +115,9 @@ public:
 	WORD sCmd;	//命令类型
 	std::string strData;	//内容
 	WORD sSum;	//和校验
+	std::string strOut; //整个包
 };
+#pragma pack(pop)
 
 //构造单例模式
 class CServerSocket
@@ -162,6 +197,13 @@ public:
 		}
 
 		return send(m_client, pData, nSize, 0);
+	}
+	BOOL Send(CPacket& pack) {
+		if (m_client == -1) {
+			return FALSE;
+		}
+		return send(m_client, pack.Data(), pack.Size(), 0);
+
 	}
 private:
 	SOCKET m_sock, m_client;
