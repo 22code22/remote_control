@@ -9,6 +9,7 @@
 #include <io.h>
 #include <stdio.h>
 #include <list>
+#include <atlimage.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -268,6 +269,41 @@ int MouseEvent() {
     return 0;
 }
 
+int SendScreen() {
+    CImage screen;  //图像类GDI
+    HDC hScreen = ::GetDC(NULL);    //获取屏幕句柄
+    int nBitPerPixel = GetDeviceCaps(hScreen, BITSPIXEL);   //ARGB8888 32bit   RGB888 24bit
+    int nWidth = GetDeviceCaps(hScreen, HORZRES);
+    int nHigh = GetDeviceCaps(hScreen, VERTRES);
+    screen.Create(nWidth, nHigh, nBitPerPixel); //创建图像
+    BitBlt(screen.GetDC(), 0, 0, 1920, 1020, hScreen, 0, 0, SRCCOPY);
+    ReleaseDC(NULL, hScreen);
+    HGLOBAL hMen = GlobalAlloc(GMEM_MOVEABLE, 0);   //可变化内存句柄
+    if (hMen == NULL)
+    {
+        return -1;
+    }
+    IStream* pStream = NULL;    
+    HRESULT ret = CreateStreamOnHGlobal(hMen, TRUE, &pStream);   //建立内存流 
+    if (ret == S_OK) {
+		screen.Save(pStream, Gdiplus::ImageFormatPNG);  //保存进内存中
+        LARGE_INTEGER bg = { 0 };
+        pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+        PBYTE pData = (PBYTE)GlobalLock(hMen);
+        size_t nSize = GlobalSize(hMen);
+
+		CPacket pack(6, pData, nSize);
+        CServerSocket::getInstance()->Send(pack);
+		GlobalUnlock(hMen);
+    }
+    //释放资源
+    pStream->Release();
+    GlobalFree(hMen);
+	screen.ReleaseDC();
+
+    return 0;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -326,6 +362,8 @@ int main()
                 break;
             case 5: //鼠标操作
                 MouseEvent();
+            case 6: //远程监控,发送屏幕截图
+                SendScreen();
             default:
                 break;
             }
